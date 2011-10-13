@@ -8,30 +8,13 @@ module Instapaper
 
     attr_writer :hydra
 
-    def initialize(oauth_key, oauth_secret, username, password)
-      @oauth_options = {:consumer_key => oauth_key, :consumer_secret => oauth_secret}
-      @oauth_creds = {:username => username, :password => password}
+    def initialize(oauth_key, oauth_secret, token, token_secret)
+      @oauth_options = {:consumer_key => oauth_key, :consumer_secret => oauth_secret, :token => token, :token_secret => token_secret}
       @hydra = Typhoeus::Hydra.new
     end
 
-    def get_access_token
-      path = "/oauth/access_token"
-      options = {
-        :x_auth_username => @oauth_creds[:username],
-        :x_auth_password => @oauth_creds[:password],
-        :x_auth_mode => "client_auth",
-      }
-
-      response = send_request(path, options)
-
-      raise AuthenticationError, response.body unless response.success?
-
-      @oauth_options.merge!(parse_authenticate_body(response.body))
-      authenticated?
-    end
-
     def authenticated?
-      @oauth_options[:token] && @oauth_options[:token_secret]
+      true
     end
 
     def list_bookmarks(options = {})
@@ -102,20 +85,14 @@ module Instapaper
     end
 
     private
-
-    def parse_authenticate_body(body)
-      uri = Addressable::URI.new(:query => body)
-      {:token => uri.query_values["oauth_token"], :token_secret => uri.query_values["oauth_token_secret"]}
-    end
-
     def call(path, options = {})
-      get_access_token unless authenticated?
       send_request(path, options)
     end
 
     def send_request(path, options = {})
       uri = "#{BASE_URI}#{path}"
       req = Typhoeus::Request.new(uri, :method => :post, :params => options)
+
       oauth_header = SimpleOAuth::Header.new(req.method, uri, options, @oauth_options)
       req.headers.merge!({"Authorization" => oauth_header.to_s})
 
